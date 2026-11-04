@@ -1,0 +1,58 @@
+services:
+  api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://dingochat:dingochat@postgres:5432/dingochat?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in your environment}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-1h}
+      BCRYPT_ROUNDS: ${BCRYPT_ROUNDS:-12}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-demo-dingochat}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${FIREBASE_SERVICE_ACCOUNT_JSON:-}
+      FIRESTORE_EMULATOR_HOST: firestore:8080
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      firestore:
+        condition: service_healthy
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: dingochat
+      POSTGRES_PASSWORD: dingochat
+      POSTGRES_DB: dingochat
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dingochat -d dingochat"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+  firestore:
+    build:
+      context: .
+      dockerfile: docker/firebase-emulator.Dockerfile
+    environment:
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-demo-dingochat}
+    command: ["sh", "-c", "firebase emulators:start --only firestore --project $$FIREBASE_PROJECT_ID --config /firebase/firebase.json"]
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./firebase.json:/firebase/firebase.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:8080').then(r=>process.exit(r.status < 500 ? 0 : 1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+volumes:
+  postgres_data:

@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChatType {
+  DIRECT
+  GROUP
+}
+
+enum ParticipantRole {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id           String            @id @default(uuid()) @db.Uuid
+  name         String            @db.VarChar(100)
+  email        String            @unique @db.VarChar(254)
+  passwordHash String            @map("password_hash")
+  avatarUrl    String?           @map("avatar_url")
+  createdAt    DateTime          @default(now()) @map("created_at")
+  updatedAt    DateTime          @updatedAt @map("updated_at")
+  createdChats Chat[]            @relation("ChatCreator")
+  participations ChatParticipant[]
+
+  @@map("users")
+}
+
+model Chat {
+  id             String            @id @default(uuid()) @db.Uuid
+  type           ChatType
+  name           String?           @db.VarChar(100)
+  description    String?           @db.VarChar(500)
+  createdById    String            @map("created_by_id") @db.Uuid
+  directUserLow  String?           @map("direct_user_low") @db.Uuid
+  directUserHigh String?           @map("direct_user_high") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  creator        User              @relation("ChatCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  participants   ChatParticipant[]
+
+  @@unique([directUserLow, directUserHigh])
+  @@index([createdAt])
+  @@map("chats")
+}
+
+model ChatParticipant {
+  id       String           @id @default(uuid()) @db.Uuid
+  chatId   String           @map("chat_id") @db.Uuid
+  userId   String           @map("user_id") @db.Uuid
+  role     ParticipantRole  @default(MEMBER)
+  joinedAt DateTime         @default(now()) @map("joined_at")
+  leftAt   DateTime?        @map("left_at")
+  chat     Chat             @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, leftAt, chatId])
+  @@index([chatId, leftAt])
+  @@map("chat_participants")
+}
