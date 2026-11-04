@@ -1,0 +1,7 @@
+node_modules
+dist
+.env
+.firebase/
+coverage/
+*.log
+service-account*.json
